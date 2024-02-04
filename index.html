@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forum Website</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        .message-box {
+            border: 1px solid #ccc;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .comment-box {
+            margin-top: 10px;
+            margin-left: 20px;
+        }
+
+        .remove-btn {
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-3">Forum Website</h1>
+
+        <form id="messageForm">
+            <div class="form-group">
+                <label for="name">Name:</label>
+                <input type="text" class="form-control" id="name" required>
+            </div>
+
+            <div class="form-group">
+                <label for="message">Message:</label>
+                <textarea class="form-control" id="message" required></textarea>
+            </div>
+
+            <button type="submit" class="btn btn-primary">Post Message</button>
+        </form>
+
+        <div id="messageContainer"></div>
+    </div>
+
+    <!-- Bootstrap JS and Popper.js -->
+    <script src="https://code.jquery.com/jquery-3.2.1.slim.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/js/bootstrap.min.js"></script>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const messageForm = document.getElementById('messageForm');
+            const messageContainer = document.getElementById('messageContainer');
+
+            const messages = [];
+
+            const renderMessages = () => {
+                messageContainer.innerHTML = messages.map(message =>
+                    `<div class="message-box">
+                        <strong>${message.name}:</strong> ${message.message}
+                        <button class="btn btn-danger btn-sm remove-btn" data-id="${message._id}">Remove</button>
+                        <div class="comment-box">
+                            ${renderComments(message.comments)}
+                        </div>
+                        <div class="form-group mt-2">
+                            <input type="text" class="form-control" placeholder="Your comment" id="comment-${message._id}">
+                            <button class="btn btn-secondary btn-sm mt-2 add-comment-btn" data-id="${message._id}">Add Comment</button>
+                        </div>
+                    </div>`
+                ).join('');
+            };
+
+            const renderComments = (comments) => {
+                return comments.map(comment => `<div>${comment}</div>`).join('');
+            };
+
+            const getMessages = async () => {
+                try {
+                    const response = await fetch('/getMessages');
+                    const fetchedMessages = await response.json();
+
+                    messages.length = 0;
+                    messages.push(...fetchedMessages);
+
+                    renderMessages();
+                } catch (error) {
+                    console.error('Error fetching messages:', error);
+                }
+            };
+
+            const handleSubmit = async (event) => {
+                event.preventDefault();
+
+                const name = document.getElementById('name').value;
+                const message = document.getElementById('message').value;
+
+                try {
+                    await fetch('/addMessage', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ name, message }),
+                    });
+
+                    document.getElementById('name').value = '';
+                    document.getElementById('message').value = '';
+
+                    await getMessages();
+                } catch (error) {
+                    console.error('Error posting message:', error);
+                }
+            };
+
+            const handleRemove = async (event) => {
+                const messageId = event.target.dataset.id;
+
+                try {
+                    await fetch(`/removeMessage/${messageId}`, {
+                        method: 'DELETE',
+                    });
+
+                    const index = messages.findIndex(message => message._id === messageId);
+                    if (index !== -1) {
+                        messages.splice(index, 1);
+                    }
+
+                    renderMessages();
+                } catch (error) {
+                    console.error('Error removing message:', error);
+                }
+            };
+
+            const handleAddComment = async (event) => {
+                const messageId = event.target.dataset.id;
+                const commentInput = document.getElementById(`comment-${messageId}`);
+                const comment = commentInput.value;
+
+                try {
+                    await fetch(`/addComment/${messageId}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ comment }),
+                    });
+
+                    const message = messages.find(message => message._id === messageId);
+                    if (message) {
+                        message.comments.push(comment);
+                    }
+
+                    commentInput.value = '';
+                    renderMessages();
+                } catch (error) {
+                    console.error('Error adding comment:', error);
+                }
+            };
+
+            messageForm.addEventListener('submit', handleSubmit);
+            messageContainer.addEventListener('click', (event) => {
+                if (event.target.classList.contains('remove-btn')) {
+                    handleRemove(event);
+                } else if (event.target.classList.contains('add-comment-btn')) {
+                    handleAddComment(event);
+                }
+            });
+
+            getMessages();
+        });
+    </script>
+</body>
+</html>
